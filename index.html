@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finance Pro</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body
+    class="bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white min-h-screen p-4"
+  >
+    <div class="max-w-6xl mx-auto">
+      <div class="flex justify-between items-center mb-6">
+        <img src="assets/logo.webp" alt="Logo PPA" class="logo" />
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4 mb-6">
+        <div class="background-cards p-4 rounded-2xl">
+          <p>Mês atual</p>
+          <h2>R$ <span id="currentTotal">0</span></h2>
+        </div>
+        <div class="background-cards p-4 rounded-2xl">
+          <p>Total geral</p>
+          <h2>R$ <span id="totalAll">0</span></h2>
+        </div>
+        <div class="background-cards p-4 rounded-2xl">
+          <p>Gastos</p>
+          <h2 id="count">0</h2>
+        </div>
+      </div>
+
+      <div class="bg-gray-800 p-4 rounded-2xl mb-6">
+        <div class="grid md:grid-cols-4 gap-3">
+          <input id="name" placeholder="Nome" class="p-2 rounded bg-gray-700" />
+          <input
+            id="amount"
+            type="number"
+            placeholder="Valor"
+            class="p-2 rounded bg-gray-700"
+          />
+          <input
+            id="category"
+            placeholder="Categoria"
+            class="p-2 rounded bg-gray-700"
+          />
+          <input
+            id="date"
+            type="datetime-local"
+            class="p-2 rounded bg-gray-700"
+          />
+        </div>
+        <button id="addBtn" class="mt-3 w-full background-cards p-2 rounded-xl">
+          Adicionar
+        </button>
+      </div>
+
+      <!-- Filtro por mês -->
+      <div class="bg-gray-800 p-4 rounded-2xl mb-6 flex gap-3 items-center">
+        <input id="monthFilter" type="month" class="p-2 rounded bg-gray-700" />
+        <button id="filterBtn" class="background-cards px-4 py-2 rounded1">
+          Filtrar
+        </button>
+        <button id="clearFilterBtn" class="bg-gray-600 px-4 py-2 rounded1">
+          Limpar
+        </button>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-gray-800 p-4 rounded-2xl">
+          <canvas id="categoryChart"></canvas>
+        </div>
+        <div class="bg-gray-800 p-4 rounded-2xl">
+          <canvas id="monthlyChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card-list p-4 rounded-2xl">
+        <div id="list"></div>
+      </div>
+    </div>
+
+    <script>
+      let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
+      let categoryChart, monthlyChart;
+
+      const nameEl = document.getElementById("name");
+      const amountEl = document.getElementById("amount");
+      const categoryEl = document.getElementById("category");
+      const dateEl = document.getElementById("date");
+      const listEl = document.getElementById("list");
+
+      const categoryCanvas = document.getElementById("categoryChart");
+      const monthlyCanvas = document.getElementById("monthlyChart");
+      const monthFilterEl = document.getElementById("monthFilter");
+      let selectedMonth = null;
+
+      // eventos de filtro
+      document.getElementById("filterBtn").addEventListener("click", () => {
+        selectedMonth = monthFilterEl.value;
+        render();
+      });
+
+      document
+        .getElementById("clearFilterBtn")
+        .addEventListener("click", () => {
+          selectedMonth = null;
+          monthFilterEl.value = "";
+          render();
+        });
+
+      function save() {
+        localStorage.setItem("expenses", JSON.stringify(expenses));
+      }
+
+      function addExpense() {
+        const name = nameEl.value;
+        const amount = parseFloat(amountEl.value);
+        const category = categoryEl.value;
+        const date = dateEl.value;
+
+        if (!name || !amount || !category || !date) {
+          alert("Preencha tudo");
+          return;
+        }
+
+        expenses.push({ id: Date.now(), name, amount, category, date });
+        save();
+
+        nameEl.value = "";
+        amountEl.value = "";
+        categoryEl.value = "";
+        dateEl.value = "";
+
+        render();
+      }
+
+      document.getElementById("addBtn").addEventListener("click", addExpense);
+
+      function deleteExpense(id) {
+        expenses = expenses.filter((e) => e.id !== id);
+        save();
+        render();
+      }
+
+      function render() {
+        listEl.innerHTML = "";
+
+        expenses.forEach((e) => {
+          const div = document.createElement("div");
+          div.className = "p-3 rounded flex justify-between mb-2";
+          div.innerHTML = `
+      <div>
+        <b>${e.name}</b><br>
+        <span>${e.category} • ${new Date(e.date).toLocaleString("pt-BR")}</span>
+      </div>
+      <div class="flex gap-3 items-center">
+        <span>R$ ${e.amount}</span>
+        <button class="delete-btn bg-red-600 px-4 py-1 rounded" data-id="${e.id}">Excluir</button>
+      </div>`;
+
+          listEl.appendChild(div);
+
+          // evento de delete (melhor que onclick inline)
+          div.querySelector(".delete-btn").addEventListener("click", (ev) => {
+            const id = Number(ev.target.getAttribute("data-id"));
+            deleteExpense(id);
+          });
+        });
+
+        updateStats();
+        updateCharts();
+      }
+
+      function updateStats() {
+        const now = new Date();
+        let current = 0;
+        let total = 0;
+
+        expenses.forEach((e) => {
+          const d = new Date(e.date);
+          total += e.amount;
+
+          if (
+            d.getMonth() === now.getMonth() &&
+            d.getFullYear() === now.getFullYear()
+          ) {
+            current += e.amount;
+          }
+        });
+
+        document.getElementById("currentTotal").innerText = current.toFixed(2);
+        document.getElementById("totalAll").innerText = total.toFixed(2);
+        document.getElementById("count").innerText = expenses.length;
+      }
+
+      function updateCharts() {
+        const catMap = {};
+        const monthNames = [
+          "Jan",
+          "Fev",
+          "Mar",
+          "Abr",
+          "Mai",
+          "Jun",
+          "Jul",
+          "Ago",
+          "Set",
+          "Out",
+          "Nov",
+          "Dez",
+        ];
+        const monthValues = new Array(12).fill(0);
+        const dayMap = {};
+
+        expenses.forEach((e) => {
+          catMap[e.category] = (catMap[e.category] || 0) + e.amount;
+
+          const d = new Date(e.date);
+          const monthIndex = d.getMonth();
+          monthValues[monthIndex] += e.amount;
+
+          if (selectedMonth && e.date.startsWith(selectedMonth)) {
+            const day = d.getDate();
+            dayMap[day] = (dayMap[day] || 0) + e.amount;
+          }
+        });
+
+        if (categoryChart) categoryChart.destroy();
+        if (monthlyChart) monthlyChart.destroy();
+
+        // categorias
+        categoryChart = new Chart(categoryCanvas, {
+          type: "doughnut",
+          data: {
+            labels: Object.keys(catMap),
+            datasets: [{ data: Object.values(catMap) }],
+          },
+        });
+
+        // gráfico principal
+        if (selectedMonth) {
+          const days = Object.keys(dayMap).sort((a, b) => a - b);
+
+          monthlyChart = new Chart(monthlyCanvas, {
+            type: "bar",
+            data: {
+              labels: days,
+              datasets: [
+                {
+                  label: "Gastos por dia",
+                  data: days.map((d) => dayMap[d]),
+                },
+              ],
+            },
+            options: {
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function (context) {
+                      return (
+                        "R$ " +
+                        context.raw.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
+                      );
+                    },
+                  },
+                },
+              },
+            },
+          });
+        } else {
+          monthlyChart = new Chart(monthlyCanvas, {
+            type: "bar",
+            data: {
+              labels: monthNames,
+              datasets: [
+                {
+                  label: "Gastos por mês",
+                  data: monthValues,
+                },
+              ],
+            },
+            options: {
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function (context) {
+                      return (
+                        "R$ " +
+                        context.raw.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
+                      );
+                    },
+                  },
+                },
+              },
+            },
+          });
+        }
+      }
+
+      render();
+    </script>
+
+    <link rel="manifest" href="manifest.json" />
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js");
+      }
+    </script>
+  </body>
+</html>

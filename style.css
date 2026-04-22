@@ -1,0 +1,26 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+.logo {
+  height: 150px;
+  margin: auto;
+}
+
+.background-cards {
+  background: linear-gradient(110deg, #e14f26 0%, #f7941d 45%, #fbd914 100%);
+  font-weight: 700;
+}
+
+.rounded1 { 
+  border-radius: 1.2em;
+}
+
+.card-list {
+  background: linear-gradient(110deg, #e14f26 0%, #f7941d 45%, #fbd914 100%);
+  color: rgb(255, 255, 255);
+  font-weight: 600;
+}
